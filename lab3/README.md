@@ -1,5 +1,5 @@
 # LAB 3 - Table Design and Query Tuning
-이번 Lab을 통하여, Table Compression, 반정규, 분산 키 구성 및 Sort Key 구성에 따른 영향도를 살펴볼 예정입니다. 
+이번 Lab을 통하여, Table 압축, 반정규화, Dist(분산) 키 구성 및 Sort(정렬) Key 구성에 따른 영향도를 살펴볼 예정입니다. 
 
 ## Contents
 * [시작하기 전에.](#before-you-begin)
@@ -11,13 +11,12 @@
 * [Before You Leave](#before-you-leave)
  
 ## 시작하기 전에.
-This lab assumes you have launched a Redshift cluster, loaded it with TPC Benchmark data and can gather the following information.  If you have not launched a cluster, see [LAB 1 - Creating Redshift Clusters](../lab1/README.md).  If you have not yet loaded it, see [LAB 2 - Data Loading](../lab2/README.md).
-* [Your-Redshift_Hostname]
+해당 Lab은 이미 Redshift Cluster를 기동했다고 가정하고 있으며, 이후, Sample Table에 대한 Schema생성 및 데이터 로드가 되어 있어야 합니다. 만약 Redshift Cluster가 기동되어 있지 않고, 자료 Loading이 되어 있지 않다면 [LAB 2 - Data Loading](../lab2/README.md)를 참조하여 설치하시기 바랍니다.
 * [Your-Redshift_Port]
 * [Your-Redshift_Username]
 * [Your-Redshift_Password]
 
-It also assumes you have access to a configured client tool. For more details on configuring SQL Workbench/J as your client tool, see [Lab 1 - Creating Redshift Clusters : Configure Client Tool](../lab1/README.md#configure-client-tool). As an alternative you can use the Redshift provided online Query Editor which does not require an installation.
+또한, Client Tool등을 이용하여, 해당 Redshift에 대한 접근이 되어 있어야 합니다. SQL Workbench/J에 대한 설치/설정 방법은 [Lab 1 - Creating Redshift Clusters : Configure Client Tool](../lab1/README.md#configure-client-tool)를 참고하시기 바랍니다. 이에 대한 또다른 대안으로, Redshift가 제공하는 Query Editor를 이용할 경우, 별도의 설치가 필요없습니다. 
 ```
 https://console.aws.amazon.com/redshift/home?#query:
 ```
@@ -442,7 +441,7 @@ SELECT count(1), sum(o_totalprice)
 FROM orders_v3
 WHERE o_orderdate between '1992-07-07' and '1992-07-09';
 ```
-7. 다음 두 쿼리를 실행하고 실행 시간을 기록하십시오. 첫번째 쿼리를 통하여, 실행 계획이 확실하게 컴파일 되었다는 것을 보장 받을 수 있습니다. 두 번째 쿼리를 첫번째 쿼리와는 살짜 Predicate가 다릅니다. 이로 인하여 결과 캐쉬는 적용되지 않습니다. 따라서 이전 결과 캐쉬가 적용된 쿼리보다는 늦은 응답 속도를 느낄 수 있습니다. The second has a slightly different filter condition to ensure the result cache cannot be used. You will notice the second query takes significantly longer than the second query in the previous step even though the number of rows which were aggregated is similar.  This is due to the first query's ability to take advantage of the Sort Key defined on the table.
+7. 다음 두 쿼리를 실행하고 실행 시간을 기록하십시오. 첫번째 쿼리를 통하여, 실행 계획이 확실하게 컴파일 되었다는 것을 보장 받을 수 있습니다. 두 번째 쿼리를 첫번째 쿼리와는 살짝 Where 조건문이 다릅니다. 이로 인하여 결과 캐쉬는 적용되지 않습니다. 따라서 이전 결과 캐쉬가 적용된 쿼리보다는 늦은 응답 속도를 느낄 수 있습니다. 
 ```
 SELECT count(1), sum(o_totalprice)
 FROM orders_v3
@@ -454,10 +453,10 @@ FROM orders_v3
 where o_orderkey < 600002;
 ```
 
-## Join Strategies
-Because or the distributed architecture of Redshift, in order to process data which is joined together, data may have to be broadcast from one node to another.  It’s important to analyze the explain plan on a query to identify which join strategies is being used and how to improve it.
+## Join 전략
+Redshift가 가지는 분산 아키텍처로 인하여, 두가지 이상의 데이터가 같이 처리되어야 하는 Join 프로세스를 위하여, 자료가 하나의 노드에서 다른 노드로 일부 또는 전체적으로 다시 전파될 수 있습니다. 이는 Query의 실행계획을 분석하여, 어떤 Join 전략이 이용되는지 확인하고 성능 개선을 시도할 때 중요한 단서가 됩니다. 
 
-8. Execute an EXPLAIN on the following query.  If you recall, both of these tables are distributed on the custkey.  This results in a join strategy of “Hash Join DS_DIST_NONE” and a relatively low overall “cost”.
+8. EXPLAIN 명령을 다른 Query에서 수행하십시요. 앞서 수행된 내용을 되돌아보면, 이 두 테이블이 모두 같은 custkey 컬럼을 분산키로 사용했다는 것을 기억할 수 있습니다. 이 결과는 “Hash Join DS_DIST_NONE” 이며, 상대적으로 매우 적은 비용을 지불합니다. 
 ```
 EXPLAIN
 SELECT c_mktsegment, o_orderpriority, sum(o_totalprice)
@@ -466,7 +465,7 @@ JOIN Orders_v2 o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-9. Execute an EXPLAIN on the following query.  If you recall, this version of the orders is distributed on the orderkey.  This results in a join strategy of “Hash Join DS_BCAST_INNER” and a relatively high overall “cost”.
+9. 다음 쿼리에 대하여, EXPLAIN 명령을 수행해 보십시요.  쿼리에 사용된 orders 테이블은 orderkey를 분산키로 사용한 경우입니다. 사용된 Join 전략은 “Hash Join DS_BCAST_INNER” 이며, 상대적으로 높은 비용을 지불하게 됩니다.
 ```
 EXPLAIN
 SELECT c_mktsegment, o_orderpriority, sum(o_totalprice)
@@ -475,7 +474,7 @@ JOIN Orders o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-10. Create a new version of the orders tables which is both distributed and sorted on the values as the customer table.  Execute an EXPLAIN and notice this results in a join strategy of “Merge Join DS_DIST_NONE” with the lowest cost of the three.
+10. 새로운 orders 테이블을 만들어 보도록 하겠습니다. Customer 테이블과 동일하게 분산키와 정렬키를 사용해 보도록 하겠습니다. 이후, Explain 문을 실행하고, Join 전략이 변경된 것을 확인해 보십시요. 사용된 Join 전략은 “Merge Join DS_DIST_NONE” 이며, 최저 수준의 비용만을 요구합니다. 
 ```
 CREATE TABLE orders_v4
 DISTKEY(o_custkey) SORTKEY (o_custkey) as
@@ -489,11 +488,11 @@ JOIN Orders_v4 o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-11. Execute an EXPLAIN plan on the following query which is missing the join condition.  This results in a join strategy of “XN Nested Loop DS_BCAST_INNER” and throws a warning about the cartesian product.  
+11. 다음 Query를 Explain으로 확인해 보십시요. 이 Query는 두 테이블간의 결합 조건이 없기 때문에, Cartesian product라는 두 테이블의 레코드 쌍 전체가 나오게 됩니다. 이럴 경우, Join전략은 “XN Nested Loop DS_BCAST_INNER” 이 선택되며, Cartesian Product 발생이라는 경고 문구도 같이 나옵니다. 
 ```
 EXPLAIN
 SELECT * FROM region, nation;
 ```
 
-## Before You Leave
-If you are done using your cluster, please think about decommissioning it to avoid having to pay for unused resources.
+## 떠나기 전에
+더이상 클러스터 사용을 할 필요가 없다면, 불필요한 예산 낭비를 막기 위해서 사용한 모든 Resource를 Console상에서 제거하시기 바랍니다.
