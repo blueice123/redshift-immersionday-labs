@@ -1,17 +1,17 @@
 # LAB 1 - Creating Redshift Clusters
-In this lab you will launch a new Redshift Cluster, setup connectivity and configure a JDBC Client tool.
+이 실습에서는 새로운 Redshift Cluster를 시작하고 연결을 설정하고 JDBC 클라이언트 도구를 구성합니다.
 
 ## Contents
-* [Before You Begin](#before-you-begin)
-* [Prerequisites](#prerequisites)
+* [시작하기 앞서](#before-you-begin)
+* [필요 사항](#prerequisites)
 * [Cloud Formation](#cloud-formation)
-* [Configure Security](#configure-security)
-* [Launch Redshift Cluster ](#launch-redshift-cluster)
-* [Configure Client Tool](#configure-client-tool)
-* [Run Sample Query](#run-sample-query)
-* [Before You Leave](#before-you-leave)
+* [보안 설정](#configure-security)
+* [Redshift Cluster 기동](#launch-redshift-cluster)
+* [Client 도구 설정](#configure-client-tool)
+* [Sample Query를 돌려봅시다](#run-sample-query)
+* [떠나기 전 정리](#before-you-leave)
 
-## Before You Begin
+## 시작하기 앞서
 * Determine and capture the following information and login to the [AWS Console](https://console.aws.amazon.com/). If you are new to AWS, you can [create an account](https://portal.aws.amazon.com/billing/signup).
   * [Your-AWS_Account_Id]
   * [Your_AWS_User_Name]
