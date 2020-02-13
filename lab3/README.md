@@ -2,13 +2,13 @@
 이번 Lab을 통하여, Table 압축, 반정규화, Dist(분산) 키 구성 및 Sort(정렬) Key 구성에 따른 영향도를 살펴볼 예정입니다. 
 
 ## Contents
-* [시작하기 전에.](#before-you-begin)
+* [시작하기 전에.](#시작하기-전에)
 * [컬럼 압축 및 반정규화](#compressing-and-de-normalizing)
 * [레코드 분산 및 정렬](#distributing-and-sorting)
-* [결과 캐쉬 및 실행 Plan 재활용](#result-set-caching-and-execution-plan-reuse)
-* [선택적인 필터링](#selective-filtering)
-* [조인 전략](#join-strategies)
-* [Before You Leave](#before-you-leave)
+* [결과 캐쉬 및 실행 계획 재활용](#결과-캐쉬-및-실행-계획-재활용)
+* [선택적인 필터링](#선택적인-필터링)
+* [Join 전략](#Join-전략)
+* [떠나기 전에](#떠나기-전에)
  
 ## 시작하기 전에.
 해당 Lab은 이미 Redshift Cluster를 기동했다고 가정하고 있으며, 이후, Sample Table에 대한 Schema생성 및 데이터 로드가 되어 있어야 합니다. 만약 Redshift Cluster가 기동되어 있지 않고, 자료 Loading이 되어 있지 않다면 [LAB 2 - Data Loading](../lab2/README.md)를 참조하여 설치하시기 바랍니다.
