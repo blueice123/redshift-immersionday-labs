@@ -1,16 +1,16 @@
 # LAB 3 - Table Design and Query Tuning
-In this lab you will analyze the affects of Compression, De-Normalization, Distribution and Sorting on Redshift query performance.
+이번 Lab을 통하여, Table Compression, 반정규, 분산 키 구성 및 Sort Key 구성에 따른 영향도를 살펴볼 예정입니다. 
 
 ## Contents
-* [Before You Begin](#before-you-begin)
-* [Compressing and De-Normalizing](#compressing-and-de-normalizing)
-* [Distributing and Sorting](#distributing-and-sorting)
-* [Result Set Caching and Execution Plan Reuse](#result-set-caching-and-execution-plan-reuse)
-* [Selective Filtering](#selective-filtering)
-* [Join Strategies](#join-strategies)
+* [시작하기 전에.](#before-you-begin)
+* [컬럼 압축 및 반정규화](#compressing-and-de-normalizing)
+* [레코드 분산 및 정렬](#distributing-and-sorting)
+* [결과 캐쉬 및 실행 Plan 재활용](#result-set-caching-and-execution-plan-reuse)
+* [선택적인 필터링](#selective-filtering)
+* [조인 전략](#join-strategies)
 * [Before You Leave](#before-you-leave)
  
-## Before You Begin
+## 시작하기 전에.
 This lab assumes you have launched a Redshift cluster, loaded it with TPC Benchmark data and can gather the following information.  If you have not launched a cluster, see [LAB 1 - Creating Redshift Clusters](../lab1/README.md).  If you have not yet loaded it, see [LAB 2 - Data Loading](../lab2/README.md).
 * [Your-Redshift_Hostname]
 * [Your-Redshift_Port]
@@ -21,7 +21,7 @@ It also assumes you have access to a configured client tool. For more details on
 ```
 https://console.aws.amazon.com/redshift/home?#query:
 ```
-## Compressing and De-Normalizing
+## 압축 및 반정규화
 ### Standard layout
 Redshift는 많은 양의 데이터에서 작동합니다. Redshift 워크로드를 최적화하기 위해 핵심 원칙 중 하나는 저장된 데이터 양을 줄이는 것입니다. 압축 알고리즘 세트를 사용하여이 볼륨을 줄입니다. 다른 유형과 기능의 값을 포함하는 전체 데이터 행을 처리하는 대신 Redshift는 열 방식으로 작동하므로 단일 열의 데이터에서 작동 할 수있는 알고리즘을 구현할 수있어 효율성이 크게 향상됩니다. 이 예에서는 데이터를 테이블에로드하고 사용할 수있는 압축 체계를 테스트합니다.
 
@@ -244,9 +244,9 @@ ANALYZE COMPRESSION orders_v1;
 ```
 
 ### All Together
-This last step will use the new distribution and sort keys, and the compression settings proposed by Redshift.
+마지막 진행 내용은 레코드의 분산 및 정렬 키를 활용하는 것입니다. 물론 맢에서 나왔던 Redshift가 권고하는 압축 설정도 같이 활용할 예정입니다. 
 
-4. Create the orders table using the recommended compression propositions, keeping DISTKEY to customer key and SORTKEY to order date.  Note: Encoding has not been added to the order date field as per the best practices because the order date is used as a sort key.
+4. 권장 압축 제안을 사용하여 DISTKEY를 고객 키에, SORTKEY를 주문 날짜로 유지하여 주문 테이블을 작성하십시오. 참고 : 주문 날짜는 정렬 키로 사용되므로 모범 사례에 따라 주문 날짜 필드에 인코딩이 추가되지 않았습니다.
 ```
 CREATE TABLE orders_v2 (
   o_orderkey int8 NOT NULL PRIMARY KEY ENCODE ZSTD                 ,
@@ -261,7 +261,7 @@ CREATE TABLE orders_v2 (
 ) DISTKEY (o_custkey) SORTKEY(o_orderdate);
 ```
 
-5. Import data and build statistics.
+5. 기존 테이블에서 자료를 Import하고, 통계를 돌려주십시요. 
 ```
 INSERT INTO orders_v2
 SELECT * FROM orders_v1;
@@ -270,7 +270,7 @@ SELECT * FROM orders_v1;
 ANALYZE orders_v2;
 ```
 
-6. Finally, let do one more version using ALL distribution type to put a copy of all the data in every slice of the cluster creating the largest data foot print but putting this data as close to all other data as possible.
+6. 마지막으로, "ALL" 분산 형태를 활용해 보도록 하겠습니다. "ALL" 분산 형태는 모든 자료를 모든 클러스터의 슬라이스에 할당하는 방식으로, 매우 큰 용량을 생성할 수 있습니다만, 다른 데이터들과 밀접하게 동일 위치에 묶을 수 있습니다. 
 ```
 CREATE TABLE orders_v3 (
   o_orderkey int8 NOT NULL PRIMARY KEY ENCODE ZSTD                     ,
@@ -285,7 +285,7 @@ CREATE TABLE orders_v3 (
 ) DISTSTYLE ALL;
 ```
 
-7. Import data and build statistics.
+7. 데이터를 로드하고, 통계치를 생성합니다. 
 ```
 INSERT INTO orders_v3
 SELECT * FROM orders_v2;
@@ -294,12 +294,13 @@ SELECT * FROM orders_v2;
 ANALYZE orders_v3;
 ```
 
-### Storage Analysis
-As for the customers, this query will analyze the storage used by the four representations of the orders table.
+### 스토리지 분석
+이 쿼리는 orders 테이블의 네 가지 표현에 사용 된 스토리지를 분석합니다.
 
-8. Analyze the difference in storage space for these 3 versions of the order table. Compression allows a 50% to 60% storage reduction on the data. The third version is the largest amount of data as it stores all data in this table in all slices of the cluster.   If you wish to learn more detailed information about distributing data in a redshift cluster please see the following:
+8. 이 3 가지 주문 테이블 버전의 스토리지 공간 차이를 분석하십시오. 압축을 통해 데이터의 저장 공간을 50 % ~ 60 % 줄일 수 있습니다. 세 번째 버전은이 테이블의 모든 데이터를 클러스터의 모든 슬라이스에 저장하므로 가장 많은 양의 데이터입니다. 레드 시프트 클러스터에 데이터를 배포하는 방법에 대한 자세한 내용을 보려면 다음을 참조하십시오.
+
 http://docs.aws.amazon.com/redshift/latest/dg/t_Distributing_data.html.
-This query gives you the storage requirements per column for each table, then the total storage for the table (repeated identically on each line).
+이 쿼리는 각 테이블의 Column이 차지하는 스토리지 요구 사항을 보여주고, 이후 각 테이블의 총 사용율 (각 라인에서 동일하게 반복됨) 제공합니다.
 ```
 SELECT
   CAST(d.attname AS CHAR(50)),
@@ -330,9 +331,9 @@ GROUP BY d.attname
 ORDER BY d.attname;
 ```
 ### Queries
-The query execution speed is also impacted by the distribution settings. This last part will issue the same query on the four versions of the order table, and analyze the time taken to execute these queries.
+쿼리 실행 속도는 분산 형태 설정의 영향을 받습니다. 이 마지막 부분은 네 가지 버전의 주문 테이블에서 동일한 쿼리를 발행하고 이러한 쿼리를 실행하는 데 걸린 시간을 분석합니다.
 
-9. Get, for the year 1995, some information on the orders passed by the customers depending on their market segment, in Asia. This query is for the first table.
+9. 1995년 대상으로, 'Asia'  마켓 세그먼트에서 커스터머가 주문한 주문 건에 대한 평균 주문 가격, 전체 주문 가격, 건수를 구해 보십시요. 이 쿼리를 첫번째 테이블에서 수행한다면, 아래와 같이 보일 것입니다. 
 ```
 SELECT c_mktsegment, COUNT(o_orderkey) AS orders_count,
 AVG(o_totalprice) AS medium_amount,
@@ -344,7 +345,7 @@ c_regionname = 'ASIA'
 GROUP BY c_mktsegment;
 ```
 
-10. Same query for the second table.
+10. 통일한 내용을 두번째 버젼에서 실행하면 아래와 같습니다. 
 ```
 SELECT c_mktsegment, COUNT(o_orderkey) AS orders_count,
 AVG(o_totalprice) AS medium_amount,
@@ -356,7 +357,7 @@ c_regionname = 'ASIA'
 GROUP BY c_mktsegment;
 ```
 
-11. For the third table. You will notice that the order of results has changed. This is due to the change in sorting and distribution, since we did not order the resultset (no ORDER clause), the “natural” (storage) order applies.
+11. 세번째 테이블에서 돌리기 전에, 주문 순선가 변경된 것을 확인할 수 있습니다. 이는 분산 키와 정렬키를 적용했기 때문인데, 쿼리에 order by 절이 없기 때문에, Database에 들어가 있는 데이터 적재, 처리 순으로 나온다는 것을 확인할 수 있습니다. 
 ```
 SELECT c_mktsegment, COUNT(o_orderkey) AS orders_count,
 AVG(o_totalprice) AS medium_amount,
@@ -368,7 +369,7 @@ c_regionname = 'ASIA'
 GROUP BY c_mktsegment;
 ```
 
-12. Analyze the performances of each query. This query gets the 3 last queries ran against the database. The results go up to around 75% query time improvement with the right distribution, sort and compression schemes (orders_v1 vs orders_v2).  The ALL distribution (v3) should really be used only if a dimension table cannot be collocated with the fact table or other important joining tables, you can improve query performance significantly by distributing the entire table to all of the nodes. Using ALL distribution multiplies storage space requirements and increases load times and maintenance operations, so you should weigh all factors before choosing ALL distribution. (The numbers will vary depending on the cluster topology)
+12. 각 쿼리의 성능을 분석하십시오. 이 쿼리는 데이터베이스에 대해 마지막으로 실행 된 3 개의 쿼리를 가져옵니다. 결과는 올바른 분배, 정렬 및 압축 체계 (orders_v1 대 orders_v2)를 사용하여 쿼리 시간이 약 75 % 향상됩니다. 차원 테이블을 팩트 테이블 또는 기타 중요한 조인 테이블과 함께 배치 할 수없는 경우에만 ALL 분배(v3)를 사용해야합니다. 전체 테이블을 모든 노드에 분배하여 쿼리 성능을 크게 향상시킬 수 있습니다. ALL 분배를 사용하면 스토리지 공간 요구 사항이 증가하고 로드 시간 및 유지 보수 조작이 증가하므로 ALL 분배를 선택하기 전에 모든 요소를 평가해야합니다. (수는 클러스터 토폴로지에 따라 다릅니다)
 ```
 SELECT query, TRIM(querytxt) as SQL, starttime, endtime, DATEDIFF(microsecs, starttime, endtime) AS duration
 FROM STL_QUERY
@@ -377,10 +378,10 @@ ORDER BY starttime DESC
 LIMIT 3;
 ```
 
-## Result Set Caching and Execution Plan Reuse
-Redshift enables a result set cache to speed up retrieval of data when it knows that the data in the underlying table has not changed.  It can also re-use compiled query plans when only the predicate of the query has changed.
+## 결과 캐쉬 및 실행 계획 재활용 
+Redshift는 기본 테이블의 데이터가 변경되지 않았다고 판단할 경우, 결과 세트 캐시를 통하여 데이터 검색 속도를 높일 수 있습니다. 쿼리의 술어만(Where 조건 절의 Parameter) 변경된 경우 컴파일 된 쿼리 계획을 재사용 할 수도 있습니다.
 
-1. Execute the following query and note the query execution time.  Since this is the first execution of this query Redshift will need to compile the query as well as cache the result set.
+1. 다음 쿼리를 실행하고 쿼리 실행 시간을 기록하십시오. 이것이이 쿼리의 첫 번째 실행이므로 Redshift는 쿼리를 컴파일하고 결과 세트를 캐시해야합니다.
 ```
 SELECT c_mktsegment, o_orderpriority, sum(o_totalprice)
 FROM Customer_v3 c
@@ -388,7 +389,7 @@ JOIN Orders_v2 o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-2. Execute the same query a second time and note the query execution time.  In the second execution redshift will leverage the result set cache and return immediately.
+2. 동일한 쿼리를 두 번 실행하고 쿼리 실행 시간을 기록하십시오. 두 번째 실행에서 redshift는 결과 세트 캐시를 활용하고 즉시 리턴합니다.
 ```
 SELECT c_mktsegment, o_orderpriority, sum(o_totalprice)
 FROM Customer_v3 c
@@ -396,7 +397,7 @@ JOIN Orders_v2 o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-3. Update data in the table and run the query again. When data in an underlying table has changed Redshift will be aware of the change and invalidate the result set cache associated to the query.  Note the execution time is not as fast as Step 2, but faster than Step 1 because while it couldn’t re-use the cache it could re-use the compiled plan.
+3. 테이블의 데이터를 업데이트하고 쿼리를 다시 실행하십시오. 기본 테이블의 데이터가 변경되면 Redshift는 변경 사항을 인식하고 쿼리와 관련된 결과 집합 캐시를 무효화합니다. 실행 시간은 2 단계만큼 빠르지는 않지만 1 단계보다 빠릅니다. 캐시를 재사용 할 수는 없지만 컴파일 된 계획을 재사용 할 수 있기 때문입니다.
 ```
 UPDATE customer_v3
 SET c_mktsegment = c_mktsegment
@@ -412,14 +413,14 @@ JOIN Orders_v2 o on c.c_custkey = o.o_custkey
 GROUP BY c_mktsegment, o_orderpriority;
 ```
 
-4. Execute a new query with a predicate and note the query execution time.  Since this is the first execution of this query Redshift will need to compile the query as well as cache the result set.
+4. 술어를 사용하여 새 쿼리를 실행하고 쿼리 실행 시간을 기록하십시오. 이것이이 쿼리의 첫 번째 실행이므로 Redshift는 쿼리를 컴파일하고 결과 세트를 캐시해야합니다.
 ```
 SELECT c_mktsegment, count(1)
 FROM Customer_v3 c
 WHERE c_mktsegment = 'MACHINERY'
 GROUP BY c_mktsegment;
 ```
-5. Execute the query with a slightly different predicate and note that the execution time is faster than the prior execution even though a very similar amount of data was scanned and aggregated.  This behavior is due to the re-use of the compile cache because only the predicate has changed.  This type of pattern is typical for BI reporting where the SQL pattern remains consistent with different users retrieving data associated to different predicates.
+5. 약간 다른 술어를 사용하여 쿼리를 실행하고 매우 유사한 양의 데이터를 스캔하고 집계하더라도 실행 시간이 이전 실행보다 빠릅니다. 술어만 변경 되었기 때문에이 동작은 컴파일 캐시의 재사용으로 인해 발생합니다. 이 유형의 패턴은 SQL 패턴이 다른 술어와 연관된 데이터를 검색하는 다른 사용자와 일관성을 유지하는 BI보고에 일반적입니다.
 ```
 SELECT c_mktsegment, count(1)
 FROM Customer_v3 c
@@ -427,10 +428,10 @@ WHERE c_mktsegment = 'BUILDING'
 GROUP BY c_mktsegment;
 ```
 
-## Selective Filtering
-Redshift takes advantage of zone maps which allows the optimizer to skip reading blocks of data when it knows that the filter criteria will not be matched.   In the case of the orders_v3 table, because we have defined a sort key on the o_order_date, queries leveraging that field as a predicate will return much faster.
+## 선택적인 필터링
+Redshift는 영역 맵을 활용하므로 필터 기준이 일치하지 않을 경우 옵티마이 저가 데이터 블록 읽기를 건너 뛸 수 있습니다. orders_v3 테이블의 경우 o_order_date에 정렬 키를 정의 했으므로 해당 필드를 술어로 사용하는 쿼리가 훨씬 빠르게 리턴됩니다.
 
-6. Execute the following two queries noting the execution time of each.  The first query is to ensure the plan is compiled.  The second has a slightly different filter condition to ensure the result cache cannot be used.
+6. 각각의 실행 시간을 나타내는 다음 두 쿼리를 실행하십시오. 첫 번째 쿼리는 계획이 컴파일되었는지 확인하는 것입니다. 두 번째는 결과 캐시를 사용할 수 없도록 필터 조건이 약간 다릅니다.
 ```
 SELECT count(1), sum(o_totalprice)
 FROM orders_v3
@@ -441,7 +442,7 @@ SELECT count(1), sum(o_totalprice)
 FROM orders_v3
 WHERE o_orderdate between '1992-07-07' and '1992-07-09';
 ```
-7. Execute the following two queries noting the execution time of each.  The first query is to ensure the plan is compiled.  The second has a slightly different filter condition to ensure the result cache cannot be used. You will notice the second query takes significantly longer than the second query in the previous step even though the number of rows which were aggregated is similar.  This is due to the first query's ability to take advantage of the Sort Key defined on the table.
+7. 다음 두 쿼리를 실행하고 실행 시간을 기록하십시오. 첫번째 쿼리를 통하여, 실행 계획이 확실하게 컴파일 되었다는 것을 보장 받을 수 있습니다. 두 번째 쿼리를 첫번째 쿼리와는 살짜 Predicate가 다릅니다. 이로 인하여 결과 캐쉬는 적용되지 않습니다. 따라서 이전 결과 캐쉬가 적용된 쿼리보다는 늦은 응답 속도를 느낄 수 있습니다. The second has a slightly different filter condition to ensure the result cache cannot be used. You will notice the second query takes significantly longer than the second query in the previous step even though the number of rows which were aggregated is similar.  This is due to the first query's ability to take advantage of the Sort Key defined on the table.
 ```
 SELECT count(1), sum(o_totalprice)
 FROM orders_v3
